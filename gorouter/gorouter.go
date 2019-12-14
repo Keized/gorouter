@@ -1,4 +1,4 @@
-package routergo
+package gorouter
 
 import (
 	"net/http"
@@ -6,7 +6,37 @@ import (
 	"regexp"
 )
 
-type Handler func(http.ResponseWriter, *http.Request, map[string]string)
+
+/***************
+**** PARAMS ****
+****************/
+type Param struct {
+	key 	string
+	value 	string
+}
+
+type Params struct {
+	items []Param
+}
+
+func (params *Params) Get(key string) (s string){
+	for _, p := range params.items {
+		if p.key == key {
+			return p.value
+		}
+	}
+	return ""
+}
+
+func (params *Params) Add(param Param) (err error) {
+	params.items = append(params.items, param)
+	return
+}
+
+/***************
+**** ROUTER ****
+****************/
+type Handler func(http.ResponseWriter, *http.Request, Params)
 
 type Route struct {
 	method  string
@@ -28,13 +58,16 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		match := reg2.FindString(url)
 
 		if match == url {
-			params := map[string]string {}
+			var params Params
 			paramsValues := reg2.FindStringSubmatch(url)
 			paramsIndexes := reg1.FindAllString(rt.path, -1)
 			paramsValues = paramsValues[2:]
 
 			for i, param := range paramsIndexes {
-				params[param[1:]] = paramsValues[i]
+				err := params.Add(Param{param[1:], paramsValues[i]})
+				if err != nil {
+					panic(err)
+				}
 			}
 
 			rt.handler(w, req, params)
@@ -76,5 +109,8 @@ func (r *Router) OPTIONS(path string, handler Handler) {
 }
 
 func notFound(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("404: Page not found"))
+	_, err := w.Write([]byte("404: Page not found"))
+	if err != nil {
+		panic(err)
+	}
 }
